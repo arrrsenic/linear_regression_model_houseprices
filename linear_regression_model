@@ -1,0 +1,111 @@
+"""
+California Housing - Linear Regression
+==========================================================================
+
+Learning goals:
+  1. Load and prepare a dataset with pandas
+  2. Train a LinearRegression model with scikit-learn
+  3. Evaluate the model with RMSE on both the training set and the test set
+  4. Understand underfitting and overfitting through practical examples
+  5. Visualize the results with matplotlib
+
+Requirements:  pip install pandas scikit-learn matplotlib numpy
+The housing.csv file must be in the same folder as this script.
+"""
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.model_selection import train_test_split
+from sklearn.linear_model import LinearRegression
+
+from sklearn.metrics import mean_squared_error
+
+
+
+
+def rmse(y_true, y_pred):
+    """Root Mean Squared Error: average error in the same unit as the target (dollars)."""
+    return np.sqrt(mean_squared_error(y_true, y_pred))
+
+
+# =============================================================================
+# 1. LOADING AND EXPLORING THE DATASET
+# =============================================================================
+df = pd.read_csv("housing.csv")
+
+print("Dataset shape:", df.shape)
+print("\nFirst rows:")
+print(df.head())
+print("\nMissing values per column:")
+print(df.isna().sum())
+print("\nDescriptive statistics:")
+print(df.describe().round(2))
+
+# Exploratory plot: median income is the feature most related to house value
+plt.figure(figsize=(7, 5))
+plt.scatter(df["median_income"], df["median_house_value"], alpha=0.1, s=5)
+plt.xlabel("Median income (tens of thousands of $)")
+plt.ylabel("Median house value ($)")
+plt.title("Median income vs house value")
+plt.tight_layout()
+plt.savefig("01_exploration.png", dpi=120)
+plt.show()
+
+# =============================================================================
+# 2. DATA PREPARATION
+# =============================================================================
+# a) total_bedrooms has about 200 missing values: we fill them with the median
+df["total_bedrooms"] = df["total_bedrooms"].fillna(df["total_bedrooms"].median())
+
+# b) ocean_proximity is text: we turn it into 0/1 columns (one-hot encoding)
+df = pd.get_dummies(df, columns=["ocean_proximity"], dtype=int)
+
+# c) Separate the features (X) from the target (y)
+X = df.drop(columns="median_house_value")
+y = df["median_house_value"]
+
+# d) Train / test split: 80% to train, 20% to evaluate.
+#    The test set simulates "new data" the model has never seen.
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2)
+print(f"\nTraining set: {len(X_train)} rows | Test set: {len(X_test)} rows")
+
+# =============================================================================
+# 3. TRAINING THE LINEAR REGRESSION
+# =============================================================================
+model = LinearRegression()
+model.fit(X_train, y_train)          # <-- this is where the learning happens
+
+y_pred_train = model.predict(X_train)
+y_pred_test = model.predict(X_test)
+
+rmse_train = rmse(y_train, y_pred_train)
+rmse_test = rmse(y_test, y_pred_test)
+
+print("\n--- Linear regression ---")
+print(f"RMSE training: {rmse_train:,.0f} $")
+print(f"RMSE test:     {rmse_test:,.0f} $")
+print(f"Average house value: {y.mean():,.0f} $")
+
+
+# Coefficients: how much each feature weighs in the prediction
+coefficients = pd.Series(model.coef_, index=X.columns).sort_values()
+print("\nModel coefficients:")
+print(coefficients.round(2))
+
+# Plot: actual vs predicted values on the test set
+plt.figure(figsize=(7, 6))
+plt.scatter(y_test, y_pred_test, alpha=0.2, s=5)
+limits = [0, 520_000]
+plt.plot(limits, limits, "r--", label="Perfect prediction")
+plt.xlim(limits)
+plt.ylim(limits)
+plt.xlabel("Actual value ($)")
+plt.ylabel("Predicted value ($)")
+plt.title(f"Linear regression – test set (RMSE = {rmse_test:,.0f} $)")
+plt.legend()
+plt.tight_layout()
+plt.savefig("02_actual_vs_predicted.png", dpi=120)
+plt.show()
